@@ -1,0 +1,6 @@
+{
+  "appId": "com.wifidirect.app",
+  "appName": "wifidirect",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

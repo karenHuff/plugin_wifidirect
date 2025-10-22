@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">wifidirect</string>
+    <string name="title_activity_main">wifidirect</string>
+    <string name="package_name">com.wifidirect.app</string>
+    <string name="custom_url_scheme">com.wifidirect.app</string>
+</resources>
