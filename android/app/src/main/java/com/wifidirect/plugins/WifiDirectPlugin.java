@@ -121,15 +121,6 @@ public class WifiDirectPlugin extends Plugin {
          }
       }
 
-      /*if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-         if (getActivity()
-               .checkSelfPermission(Manifest.permission.ACCESS_MEDIA_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requirePermissions.add(Manifest.permission.ACCESS_MEDIA_LOCATION);
-
-            Log.w("permissions", "Permiso de ubicación solicitado");
-         }
-      }*/
-
       if (!requirePermissions.isEmpty()) {
          getActivity().requestPermissions(
                requirePermissions.toArray(new String[0]), 100);
