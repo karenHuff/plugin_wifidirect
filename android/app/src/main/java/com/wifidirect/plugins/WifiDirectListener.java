@@ -12,12 +12,16 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.List;
 
-public class WifiDirectListener extends BroadcastReceiver {
+import com.wifidirect.plugins.WifiDirectPlugin;
+import com.wifidirect.sockets.StartServerSocket;
+import com.wifidirect.sockets.StartClientSocket;
 
+public class WifiDirectListener extends BroadcastReceiver {
     private final WifiP2pManager manager;
     private final WifiP2pManager.Channel channel;
     private final WifiDirectPlugin plugin;
     private final List<WifiP2pDevice> peers = new ArrayList<>();
+    private boolean isConnecting = false;
 
     public WifiDirectListener(WifiP2pManager manager, WifiP2pManager.Channel channel, WifiDirectPlugin plugin) {
         this.manager = manager;
@@ -28,15 +32,29 @@ public class WifiDirectListener extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
-        if (action == null) return;
+        if (action == null)
+            return;
+
+        // estado del dispositivo
+        manager.requestConnectionInfo(channel, info -> {
+            if (info.groupFormed) {
+                if (info.isGroupOwner) {
+                    Log.d("WifiDirect", "Soy el Group Owner, iniciando servidor...");
+                    plugin.startServerIfNeeded(context);
+                } else {
+                    // identificar cliente
+                    plugin.onResSocket(true);
+                }
+            }
+            return;
+        });
 
         switch (action) {
-
             case WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION:
                 manager.requestPeers(channel, peerList -> {
                     peers.clear();
                     peers.addAll(peerList.getDeviceList());
-                    
+
                     // Mostrar lista de dispostivos disponibles
                     plugin.onListPeers(peers);
                 });
@@ -49,7 +67,6 @@ public class WifiDirectListener extends BroadcastReceiver {
                 } else {
                     Log.d("WifiDirect", "Desconectado del grupo P2P");
                     plugin.onDisconnected();
-                    //isConnecting = false;
                 }
                 break;
         }

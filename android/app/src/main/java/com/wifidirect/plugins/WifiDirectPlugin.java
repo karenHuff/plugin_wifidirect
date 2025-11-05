@@ -23,6 +23,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.wifidirect.sockets.StartServerSocket;
+import com.wifidirect.sockets.StartClientSocket;
+
 @CapacitorPlugin(name = "WifiDirect")
 public class WifiDirectPlugin extends Plugin {
 
@@ -30,7 +33,6 @@ public class WifiDirectPlugin extends Plugin {
    private WifiP2pManager.Channel channel;
    private WifiDirectListener receiver;
    private IntentFilter intentFilter;
-   private JSObject ret = new JSObject();
    private boolean isConnecting = false; // evita reconexiones múltiples
 
    @Override
@@ -61,8 +63,6 @@ public class WifiDirectPlugin extends Plugin {
             Toast.makeText(getActivity(), "Activa el Wi-Fi", Toast.LENGTH_SHORT).show();
             return;
          }
-
-         // Veificar si Wi-Fi direct está habilitado
 
       } else {
          Log.e("WifiDirect", "WifiP2pManager no disponible");
@@ -108,7 +108,7 @@ public class WifiDirectPlugin extends Plugin {
                .checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
             requirePermissions.add(Manifest.permission.NEARBY_WIFI_DEVICES);
 
-            Log.w("WifiDirect", "Permiso concedido");
+            Log.w("permissions", "Permiso solicitado");
          }
       }
 
@@ -117,7 +117,7 @@ public class WifiDirectPlugin extends Plugin {
                .checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requirePermissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
 
-            Log.w("WifiDirect", "Permiso de ubicación solicitado");
+            Log.w("permissions", "Permiso de ubicación solicitado");
          }
       }
 
@@ -130,9 +130,10 @@ public class WifiDirectPlugin extends Plugin {
       return true;
    }
 
-   // Método principal llamado desde JavaScript
+   // Método para iniciar descubrimiento
    @PluginMethod
    public void startDiscovery(PluginCall call) {
+      JSObject ret = new JSObject();
       if (manager == null || channel == null) {
          ret.put("WifiP2pManager", "Manager no inicializado");
          call.resolve(ret);
@@ -160,8 +161,8 @@ public class WifiDirectPlugin extends Plugin {
    @PluginMethod
    public void connectTo(PluginCall call) {
       isConnecting = true;
+      JSObject ret = new JSObject();
       String deviceAddress = call.getString("deviceAddress");
-      // onPeerConnectionFailed("data: " + deviceAddress);
 
       WifiP2pConfig config = new WifiP2pConfig();
       config.deviceAddress = deviceAddress;
@@ -186,29 +187,106 @@ public class WifiDirectPlugin extends Plugin {
       });
    }
 
+   // Plugin para hacer solicitud al servidor
+   @PluginMethod
+   public void startTransfer(PluginCall call) {
+      String filePath = call.getString("file");
+      JSObject ret = new JSObject();
+
+      manager.requestConnectionInfo(channel, info -> {
+         if (info.groupFormed) {
+            if (!info.isGroupOwner) {
+               Log.d("socket", "iniciando cliente");
+               String hostAddress = info.groupOwnerAddress.getHostAddress();
+               new StartClientSocket(getContext(), filePath, hostAddress).start();
+            }
+         }
+         return;
+      });
+   }
+
+   // Plugin para desconectar dispositivos
+   @PluginMethod
+   public void closeConnection(PluginCall call) {
+      JSObject ret = new JSObject();
+
+      manager.cancelConnect(channel, new WifiP2pManager.ActionListener() {
+         @Override
+         public void onSuccess() {
+            ret.put("cancel", "Conexión cancelada");
+            notifyListeners("cancel", ret);
+
+            // Eliminar grupo P2P si está formado
+            manager.removeGroup(channel, new WifiP2pManager.ActionListener() {
+               @Override
+               public void onSuccess() {
+                  ret.put("group", "Grupo P2P eliminado");
+                  notifyListeners("groupRemoved", ret);
+               }
+
+               @Override
+               public void onFailure(int reason) {
+                  ret.put("group", "No se pudo eliminar el grupo: " + reason);
+                  notifyListeners("groupRemoved", ret);
+                  call.resolve(ret);
+               }
+            });
+         }
+
+         @Override
+         public void onFailure(int reason) {
+            ret.put("cancel", "Error al cancelar conexión: " + reason);
+            notifyListeners("error", ret);
+            call.resolve(ret);
+         }
+      });
+   }
+
+   //Método para iniciar servidor
+      // En WifiDirectPlugin.java
+   private boolean serverStarted = false;
+
+   public void startServerIfNeeded(Context context) {
+      if (!serverStarted) {
+         new StartServerSocket(context).start();
+         serverStarted = true;
+      }
+   }
+
    // Eventos hacia JavaScript
    public void onPeerConnected(WifiP2pDevice device) {
+      JSObject ret = new JSObject();
       ret.put("deviceName", device.deviceName);
       ret.put("deviceAddress", device.deviceAddress);
       notifyListeners("connected", ret);
    }
 
    public void onPeerConnectionFailed(String message) {
+      JSObject ret = new JSObject();
       ret.put("error", message);
       notifyListeners("connectionFailed", ret);
    }
 
    public void onDisconnected() {
+      JSObject ret = new JSObject();
       isConnecting = false;
       ret.put("status", "Desconectado del grupo P2P");
       notifyListeners("disconnected", ret);
    }
 
+   public void onResSocket(Boolean flag) {
+      JSObject ret = new JSObject();
+      ret.put("status", flag);
+      notifyListeners("socket", ret);
+   }
+
+   // Regresar lista de dispositivos al front
    public void onListPeers(List<WifiP2pDevice> peers) {
       List<JSObject> peerList = new ArrayList<>();
+      JSObject ret = new JSObject();
 
       for (WifiP2pDevice device : peers) {
-         JSObject jsObject = new JSObject();   
+         JSObject jsObject = new JSObject();
          jsObject.put("deviceName", device.deviceName);
          jsObject.put("deviceAddress", device.deviceAddress);
          jsObject.put("status", device.status);
