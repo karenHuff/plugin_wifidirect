@@ -213,43 +213,58 @@ public class WifiDirectPlugin extends Plugin {
       manager.cancelConnect(channel, new WifiP2pManager.ActionListener() {
          @Override
          public void onSuccess() {
+            Log.d("closeConnection", "conexion cancelada por el usuario");
+
             ret.put("cancel", "Conexión cancelada");
-            notifyListeners("cancel", ret);
-
-            // Eliminar grupo P2P si está formado
-            manager.removeGroup(channel, new WifiP2pManager.ActionListener() {
-               @Override
-               public void onSuccess() {
-                  ret.put("group", "Grupo P2P eliminado");
-                  notifyListeners("groupRemoved", ret);
-               }
-
-               @Override
-               public void onFailure(int reason) {
-                  ret.put("group", "No se pudo eliminar el grupo: " + reason);
-                  notifyListeners("groupRemoved", ret);
-                  call.resolve(ret);
-               }
-            });
+            notifyListeners("closeConnection", ret);
+            call.resolve(ret);
          }
 
          @Override
          public void onFailure(int reason) {
+            Log.e("clsoeConnection", "Error al cancelar conexión");
             ret.put("cancel", "Error al cancelar conexión: " + reason);
-            notifyListeners("error", ret);
+            notifyListeners("closeConnection", ret);
+            call.resolve(ret);
+         }
+      });
+
+      // Eliminar grupo P2P si está formado
+      manager.removeGroup(channel, new WifiP2pManager.ActionListener() {
+         @Override
+         public void onSuccess() {
+            Log.d("groupRemoved", "Grupo P2P eliminado");
+            ret.put("group", "Grupo P2P eliminado");
+            notifyListeners("groupRemoved", ret);
+            call.resolve(ret);
+         }
+
+         @Override
+         public void onFailure(int reason) {
+            Log.e("groupRemoved", "Error al eliminar el grupo");
+            ret.put("group", "No se pudo eliminar el grupo: " + reason);
+            notifyListeners("groupRemoved", ret);
             call.resolve(ret);
          }
       });
    }
 
-   //Método para iniciar servidor
-      // En WifiDirectPlugin.java
+   // Método para iniciar servidor
    private boolean serverStarted = false;
 
    public void startServerIfNeeded(Context context) {
       if (!serverStarted) {
          new StartServerSocket(context).start();
          serverStarted = true;
+      }
+
+      boolean statusFalg = new StartServerSocket(context).statusFalg;
+
+      if (statusFalg) {
+         Log.d("file", "Archivo recibido");
+         JSObject ret = new JSObject();
+         ret.put("file", "Archivo recibido");
+         notifyListeners("file", ret);
       }
    }
 

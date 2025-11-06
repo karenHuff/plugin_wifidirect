@@ -13,8 +13,9 @@ import java.io.*;
 import java.lang.*;
 
 public class StartServerSocket extends Thread {
-   public static final int PORT = 8881;
+   private static final int PORT = 8881;
    private final Context context;
+   public boolean statusFalg = false;
 
    public StartServerSocket(Context context) {
       this.context = context;
@@ -54,7 +55,10 @@ public class StartServerSocket extends Thread {
                values.put(MediaStore.Downloads.IS_PENDING, 0);
                resolver.update(fileUri, values, null, null);
 
+               statusFalg = true; // indicar si se recibió el archivo
                Log.d("socket", "Archivo recibido correctamente: " + fileName);
+               
+               //Toast.makeText(context, "Archivo recibido", Toast.LENGTH_SHORT).show();
             } else {
                Log.e("server", "No se pudo crear el archivo en MediaStore");
             }
