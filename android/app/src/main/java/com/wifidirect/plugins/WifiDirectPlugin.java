@@ -222,7 +222,7 @@ public class WifiDirectPlugin extends Plugin {
 
          @Override
          public void onFailure(int reason) {
-            Log.e("clsoeConnection", "Error al cancelar conexión");
+            Log.e("closeConnection", "Error al cancelar conexión");
             ret.put("cancel", "Error al cancelar conexión: " + reason);
             notifyListeners("closeConnection", ret);
             call.resolve(ret);
