@@ -250,21 +250,12 @@ public class WifiDirectPlugin extends Plugin {
    }
 
    // Método para iniciar servidor
-   private boolean serverStarted = false;
+   private boolean serverStart = false;
 
-   public void startServerIfNeeded(Context context) {
-      if (!serverStarted) {
-         new StartServerSocket(context).start();
-         serverStarted = true;
-      }
-
-      boolean statusFalg = new StartServerSocket(context).statusFalg;
-
-      if (statusFalg) {
-         Log.d("file", "Archivo recibido");
-         JSObject ret = new JSObject();
-         ret.put("file", "Archivo recibido");
-         notifyListeners("file", ret);
+   public void serverStarted(Context context) {
+      if (!serverStart) {
+         new StartServerSocket(context, this).start();
+         serverStart = true;
       }
    }
 
@@ -310,5 +301,11 @@ public class WifiDirectPlugin extends Plugin {
 
       ret.put("listPeers", peerList);
       notifyListeners("listPeers", ret);
+   }
+
+   public void onFileTransfer() {
+      JSObject ret = new JSObject();
+      ret.put("file", "Archivo recibido");
+      notifyListeners("file", ret);
    }
 }

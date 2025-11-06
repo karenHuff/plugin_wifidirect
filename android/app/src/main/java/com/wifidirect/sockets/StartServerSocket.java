@@ -12,13 +12,16 @@ import java.net.*;
 import java.io.*;
 import java.lang.*;
 
+import com.wifidirect.plugins.WifiDirectPlugin;
+
 public class StartServerSocket extends Thread {
    private static final int PORT = 8881;
    private final Context context;
-   public boolean statusFalg = false;
+   private WifiDirectPlugin plugin;
 
-   public StartServerSocket(Context context) {
+   public StartServerSocket(Context context, WifiDirectPlugin plugin) {
       this.context = context;
+      this.plugin = plugin;
    }
 
    @Override
@@ -55,10 +58,8 @@ public class StartServerSocket extends Thread {
                values.put(MediaStore.Downloads.IS_PENDING, 0);
                resolver.update(fileUri, values, null, null);
 
-               statusFalg = true; // indicar si se recibió el archivo
-               Log.d("socket", "Archivo recibido correctamente: " + fileName);
-               
-               //Toast.makeText(context, "Archivo recibido", Toast.LENGTH_SHORT).show();
+               plugin.onFileTransfer();
+               Log.d("file", "Archivo recibido correctamente: " + fileName);
             } else {
                Log.e("server", "No se pudo crear el archivo en MediaStore");
             }

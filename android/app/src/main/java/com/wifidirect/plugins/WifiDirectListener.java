@@ -40,7 +40,7 @@ public class WifiDirectListener extends BroadcastReceiver {
             if (info.groupFormed) {
                 if (info.isGroupOwner) {
                     Log.d("WifiDirect", "Soy el Group Owner, iniciando servidor...");
-                    plugin.startServerIfNeeded(context);
+                    plugin.serverStarted(context);
                 } else {
                     // identificar cliente
                     plugin.onResSocket(true);
