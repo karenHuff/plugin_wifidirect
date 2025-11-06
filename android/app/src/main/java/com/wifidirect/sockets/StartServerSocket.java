@@ -59,9 +59,9 @@ public class StartServerSocket extends Thread {
                   values.clear();
                   values.put(MediaStore.Downloads.IS_PENDING, 0);
                   resolver.update(fileUri, values, null, null);
-
-                  plugin.onFileTransfer();
+                  
                   Log.d("file", "Archivo recibido correctamente: " + fileName);
+                  plugin.onFileTransfer(fileUri);
                } else {
                   Log.e("server", "No se pudo crear el archivo en MediaStore");
                }

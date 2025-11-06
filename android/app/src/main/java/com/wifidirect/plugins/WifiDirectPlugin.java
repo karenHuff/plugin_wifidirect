@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 import android.widget.Toast;
+import android.net.Uri;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -303,9 +304,11 @@ public class WifiDirectPlugin extends Plugin {
       notifyListeners("listPeers", ret);
    }
 
-   public void onFileTransfer() {
+   public void onFileTransfer(String fileName) {
+      Log.d("file", fileName);
+      String filePath = fileUri.getPath();
       JSObject ret = new JSObject();
-      ret.put("file", "Archivo recibido");
+      ret.put("file", filePath.toString());
       notifyListeners("file", ret);
    }
 }
