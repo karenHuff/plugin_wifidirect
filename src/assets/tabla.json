@@ -1,0 +1,10 @@
+{"prueba": {
+   "tab1": {
+      "column1": ["clave", "pss"],
+      "column2": ["clavexxx", "pssxxx"]
+   },
+   "tab2": {
+      "column1": ["10", "true"],
+      "column2": ["0", "false"]
+   }
+}}
