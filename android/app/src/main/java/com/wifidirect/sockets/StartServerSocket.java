@@ -12,58 +12,66 @@ import java.net.*;
 import java.io.*;
 import java.lang.*;
 
-public class StartServerSocket extends Thread {
-   public static final int PORT = 8881;
-   private final Context context;
+import com.wifidirect.plugins.WifiDirectPlugin;
 
-   public StartServerSocket(Context context) {
+public class StartServerSocket extends Thread {
+   private static final int PORT = 8881;
+   private final Context context;
+   private WifiDirectPlugin plugin;
+
+   public StartServerSocket(Context context, WifiDirectPlugin plugin) {
       this.context = context;
+      this.plugin = plugin;
    }
 
    @Override
    public void run() {
       try (ServerSocket serverSocket = new ServerSocket(PORT)) {
          Log.d("socket", "Servidor a la escucha en el puerto: " + PORT);
-         Socket client = serverSocket.accept();
-         Log.d("socket", "Cliente conectado");
 
-         DataInputStream dis = new DataInputStream(client.getInputStream());
-         String fileName = dis.readUTF();
+         while (true) {
+            Socket client = serverSocket.accept();
+            Log.d("socket", "Cliente conectado");
 
-         if (fileName != null && !fileName.contains("..")) {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
-            values.put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
-            values.put(MediaStore.Downloads.IS_PENDING, 1);
+            DataInputStream dis = new DataInputStream(client.getInputStream());
+            String fileName = dis.readUTF();
 
-            ContentResolver resolver = context.getContentResolver();
-            Uri collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-            Uri fileUri = resolver.insert(collection, values);
+            if (fileName != null && !fileName.contains("..")) {
+               ContentValues values = new ContentValues();
+               values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+               values.put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
+               values.put(MediaStore.Downloads.IS_PENDING, 1);
 
-            if (fileUri != null) {
-               try (OutputStream out = resolver.openOutputStream(fileUri)) {
-                  byte[] buffer = new byte[4096];
-                  int bytesRead;
-                  while ((bytesRead = dis.read(buffer)) != -1) {
-                     out.write(buffer, 0, bytesRead);
+               ContentResolver resolver = context.getContentResolver();
+               Uri collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+               Uri fileUri = resolver.insert(collection, values);
+
+               if (fileUri != null) {
+                  try (OutputStream out = resolver.openOutputStream(fileUri)) {
+                     byte[] buffer = new byte[4096];
+                     int bytesRead;
+                     while ((bytesRead = dis.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesRead);
+                     }
+                     out.flush();
                   }
-                  out.flush();
+
+                  values.clear();
+                  values.put(MediaStore.Downloads.IS_PENDING, 0);
+                  resolver.update(fileUri, values, null, null);
+                  
+                  Log.d("file", "Archivo recibido correctamente: " + fileName);
+                  plugin.onFileTransfer(fileUri);
+               } else {
+                  Log.e("server", "No se pudo crear el archivo en MediaStore");
                }
-
-               values.clear();
-               values.put(MediaStore.Downloads.IS_PENDING, 0);
-               resolver.update(fileUri, values, null, null);
-
-               Log.d("socket", "Archivo recibido correctamente: " + fileName);
             } else {
-               Log.e("server", "No se pudo crear el archivo en MediaStore");
+               Log.e("server", "Nombre de archivo inválido o nulo");
             }
-         } else {
-            Log.e("server", "Nombre de archivo inválido o nulo");
-         }
 
-         dis.close();
-         client.close();
+            dis.close();
+            client.close();
+         }
 
       } catch (IOException e) {
          Log.e("server", "Error en el servidor: " + e.getMessage());

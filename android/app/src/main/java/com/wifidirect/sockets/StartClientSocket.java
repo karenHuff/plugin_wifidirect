@@ -13,7 +13,7 @@ import java.net.*;
 
 public class StartClientSocket extends Thread {
    public static final int PORT = 8881;
-   public static final int TIMEOUT = 5000;
+   //public static final int TIMEOUT = 5000;
 
    private final Context context;
    private final String filePath;
@@ -27,10 +27,8 @@ public class StartClientSocket extends Thread {
 
    @Override
    public void run() {
-      Socket socket = new Socket();
-
       try {
-         socket.connect(new InetSocketAddress(hostAddress, PORT), TIMEOUT);
+         Socket socket = new Socket(hostAddress, PORT);
          Log.d("socket", "Conectado al servidor...");
 
          if (filePath == null) {
@@ -61,14 +59,9 @@ public class StartClientSocket extends Thread {
             Log.d("Client", "Archivo enviado: " + fileName);
          }
 
+         socket.close();
       } catch (IOException e) {
          Log.e("Client", "Error en el cliente: " + e.getMessage());
-      } finally {
-         try {
-            socket.close();
-         } catch (IOException e) {
-            Log.e("Client", "Error al cerrar socket: " + e.getMessage());
-         }
       }
    }
 
@@ -82,9 +75,11 @@ public class StartClientSocket extends Thread {
             }
          }
       }
+
       if (result == null) {
          result = uri.getLastPathSegment();
       }
+
       return result;
    }
 }

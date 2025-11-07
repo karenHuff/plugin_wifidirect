@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import './App.css';
 import { WifiDirect } from './capacitor-wifiDirect';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 
 function App() {
   const [devices, setDevices] = useState([]);
   const [connected, setConnected] = useState(null);
   const [client, setClient] = useState(false);
+  const [uriDB, setUriDB] = useState(null);
 
   useEffect(() => {
     // Iniciar descubrimiento de peers
@@ -70,9 +72,14 @@ function App() {
     // Fin
 
     // Resultado cerrar conexión
+    WifiDirect.addListener('closeConnection', (info) => {
+      console.log('Cerrando conexión entre dispositivos', info);
+    });
+
+    //Resultado de eliminar grupo
     WifiDirect.addListener('groupRemoved', (info) => {
       console.log("Eliminando grupo... ", info);
-    })
+    });
     
     // Eventos de escucha para cliente y servidor
     WifiDirect.addListener('socket', (info) => {
@@ -81,6 +88,13 @@ function App() {
       if (info.status) {
         setClient(true);
       }
+    });
+
+    // Resultado transferencia de archivo
+    WifiDirect.addListener('file', (info) => {    
+      alert("Archivo recibido");
+      console.log('recibiendo uri: ', info);
+      volcadoDatos(info.file);
     });
 
     return () => {
@@ -97,7 +111,7 @@ function App() {
     try {
       // Abrir explorador de archivos
       const result = await FilePicker.pickFiles({
-        types: ['image/*']
+        types: ['/*']
       });
       const file = result.files[0];
 
@@ -117,6 +131,23 @@ function App() {
       .catch(error => console.log(error));
     setConnected(null);
     setClient(false);
+  }
+
+  const volcadoDatos = async (uri) => {
+   
+    /*fetch(uri)
+      .then(data => {
+        if (!data) {
+          console.warn("error al recuperar archivo");
+        }
+        return data.json();
+      })
+      .then(data => {
+        console.log(data.prueba);
+      })
+      .catch(error => {
+        console.error("Ocurrió un error: ", error);
+      });*/
   }
 
   return (

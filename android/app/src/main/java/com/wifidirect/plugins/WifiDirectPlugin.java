@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 import android.widget.Toast;
+import android.net.Uri;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -213,43 +214,49 @@ public class WifiDirectPlugin extends Plugin {
       manager.cancelConnect(channel, new WifiP2pManager.ActionListener() {
          @Override
          public void onSuccess() {
+            Log.d("closeConnection", "conexion cancelada por el usuario");
+
             ret.put("cancel", "Conexión cancelada");
-            notifyListeners("cancel", ret);
-
-            // Eliminar grupo P2P si está formado
-            manager.removeGroup(channel, new WifiP2pManager.ActionListener() {
-               @Override
-               public void onSuccess() {
-                  ret.put("group", "Grupo P2P eliminado");
-                  notifyListeners("groupRemoved", ret);
-               }
-
-               @Override
-               public void onFailure(int reason) {
-                  ret.put("group", "No se pudo eliminar el grupo: " + reason);
-                  notifyListeners("groupRemoved", ret);
-                  call.resolve(ret);
-               }
-            });
+            notifyListeners("closeConnection", ret);
+            call.resolve(ret);
          }
 
          @Override
          public void onFailure(int reason) {
+            Log.e("closeConnection", "Error al cancelar conexión");
             ret.put("cancel", "Error al cancelar conexión: " + reason);
-            notifyListeners("error", ret);
+            notifyListeners("closeConnection", ret);
+            call.resolve(ret);
+         }
+      });
+
+      // Eliminar grupo P2P si está formado
+      manager.removeGroup(channel, new WifiP2pManager.ActionListener() {
+         @Override
+         public void onSuccess() {
+            Log.d("groupRemoved", "Grupo P2P eliminado");
+            ret.put("group", "Grupo P2P eliminado");
+            notifyListeners("groupRemoved", ret);
+            call.resolve(ret);
+         }
+
+         @Override
+         public void onFailure(int reason) {
+            Log.e("groupRemoved", "Error al eliminar el grupo");
+            ret.put("group", "No se pudo eliminar el grupo: " + reason);
+            notifyListeners("groupRemoved", ret);
             call.resolve(ret);
          }
       });
    }
 
-   //Método para iniciar servidor
-      // En WifiDirectPlugin.java
-   private boolean serverStarted = false;
+   // Método para iniciar servidor
+   private boolean serverStart = false;
 
-   public void startServerIfNeeded(Context context) {
-      if (!serverStarted) {
-         new StartServerSocket(context).start();
-         serverStarted = true;
+   public void serverStarted(Context context) {
+      if (!serverStart) {
+         new StartServerSocket(context, this).start();
+         serverStart = true;
       }
    }
 
@@ -295,5 +302,13 @@ public class WifiDirectPlugin extends Plugin {
 
       ret.put("listPeers", peerList);
       notifyListeners("listPeers", ret);
+   }
+
+   public void onFileTransfer(String fileName) {
+      Log.d("file", fileName);
+      String filePath = fileUri.getPath();
+      JSObject ret = new JSObject();
+      ret.put("file", filePath.toString());
+      notifyListeners("file", ret);
    }
 }
