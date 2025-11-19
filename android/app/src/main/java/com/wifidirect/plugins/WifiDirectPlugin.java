@@ -6,14 +6,13 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.*;
-import android.os.Build;
-import android.os.Handler;
+import android.os.*;
 import android.util.Log;
 import android.widget.Toast;
-import android.net.Uri;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -32,9 +31,10 @@ public class WifiDirectPlugin extends Plugin {
 
    private WifiP2pManager manager;
    private WifiP2pManager.Channel channel;
+   private WifiP2pInfo info;
    private WifiDirectListener receiver;
    private IntentFilter intentFilter;
-   private boolean isConnecting = false; // evita reconexiones múltiples
+   private boolean isConnecting = false; //evita reconexiones múltiples
 
    @Override
    public void load() {
@@ -65,6 +65,18 @@ public class WifiDirectPlugin extends Plugin {
             return;
          }
 
+         // Iniciar WifiDirect
+         manager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
+            @Override
+            public void onSuccess() {
+               Log.d("status", "Descubrimiento iniciado correctamente");
+            }
+
+            @Override
+            public void onFailure(int reason) {
+               Log.e("error", "Fallo al iniciar descubrimiento: " + reason);
+            }
+         });
       } else {
          Log.e("WifiDirect", "WifiP2pManager no disponible");
       }
@@ -131,6 +143,30 @@ public class WifiDirectPlugin extends Plugin {
       return true;
    }
 
+   // Método para crear grupo
+   @PluginMethod
+   public void groupCreate(PluginCall call) {
+      JSObject ret = new JSObject();
+      
+      if (!info.groupFormed) {
+         manager.createGroup(channel, new WifiP2pManager.ActionListener() {
+            @Override
+            public void onSuccess() {
+               Log.d("group", "formando grupo");
+            }
+
+            @Override
+            public void onFailure(int reason) {
+               Log.e("error", "Ocurrió un error al crear el grupo");
+            }
+         });
+      }
+
+      if (info.isGroupOwner) {
+         Log.d("group", "Grupo creado");
+      }
+   }
+
    // Método para iniciar descubrimiento
    @PluginMethod
    public void startDiscovery(PluginCall call) {
@@ -145,14 +181,12 @@ public class WifiDirectPlugin extends Plugin {
          @Override
          public void onSuccess() {
             ret.put("status", "Descubrimiento iniciado correctamente");
-            notifyListeners("discovering", ret);
             call.resolve(ret);
          }
 
          @Override
          public void onFailure(int reason) {
             ret.put("error", "Fallo al iniciar descubrimiento: " + reason);
-            notifyListeners("error", ret);
             call.reject(ret.toString());
          }
       });
@@ -176,7 +210,7 @@ public class WifiDirectPlugin extends Plugin {
          public void onSuccess() {
             Log.d("WifiDirect", "Conexión iniciada con: " + deviceAddress);
             ret.put("deviceAddress", deviceAddress);
-            notifyListeners("connected", ret);
+            call.resolve(ret);
          }
 
          @Override
@@ -217,7 +251,6 @@ public class WifiDirectPlugin extends Plugin {
             Log.d("closeConnection", "conexion cancelada por el usuario");
 
             ret.put("cancel", "Conexión cancelada");
-            notifyListeners("closeConnection", ret);
             call.resolve(ret);
          }
 
@@ -225,7 +258,6 @@ public class WifiDirectPlugin extends Plugin {
          public void onFailure(int reason) {
             Log.e("closeConnection", "Error al cancelar conexión");
             ret.put("cancel", "Error al cancelar conexión: " + reason);
-            notifyListeners("closeConnection", ret);
             call.resolve(ret);
          }
       });
@@ -236,7 +268,6 @@ public class WifiDirectPlugin extends Plugin {
          public void onSuccess() {
             Log.d("groupRemoved", "Grupo P2P eliminado");
             ret.put("group", "Grupo P2P eliminado");
-            notifyListeners("groupRemoved", ret);
             call.resolve(ret);
          }
 
@@ -244,7 +275,6 @@ public class WifiDirectPlugin extends Plugin {
          public void onFailure(int reason) {
             Log.e("groupRemoved", "Error al eliminar el grupo");
             ret.put("group", "No se pudo eliminar el grupo: " + reason);
-            notifyListeners("groupRemoved", ret);
             call.resolve(ret);
          }
       });
@@ -304,11 +334,9 @@ public class WifiDirectPlugin extends Plugin {
       notifyListeners("listPeers", ret);
    }
 
-   public void onFileTransfer(String fileName) {
-      Log.d("file", fileName);
-      String filePath = fileUri.getPath();
+   public void onContentJSON(String contentJSON) {
       JSObject ret = new JSObject();
-      ret.put("file", filePath.toString());
+      ret.put("file", contentJSON);
       notifyListeners("file", ret);
    }
 }
