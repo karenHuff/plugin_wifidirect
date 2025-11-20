@@ -202,6 +202,7 @@ public class WifiDirectPlugin extends Plugin {
       WifiP2pConfig config = new WifiP2pConfig();
       config.deviceAddress = deviceAddress;
       config.wps.setup = WpsInfo.PBC;
+      config.groupOwnerIntent = config.GROUP_OWNER_INTENT_MIN;
 
       Log.d("WifiDirect", "Intentando conectar a: " + deviceAddress);
 
