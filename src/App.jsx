@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
-import './App.css';
-import { WifiDirect } from './capacitor-wifiDirect';
+import { useEffect, useState } from "react"
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
+import WifiDirect from './plugins/wifidirectPlugin';
+import { getControl } from "./API/crud";
 
 function App() {
   const [devices, setDevices] = useState([]);
-  const [resDis, setResDis] = useState()
-  const [data, setData] = useState([]);
+  const [resDis, setResDis] = useState(false);
+  const getPlatform = Capacitor.getPlatform();
 
   useEffect(() => {
+    if (getPlatform !== 'android') {
+      console.log("No soy android :(");
+      return;
+    }
+
     // Lista de dispositivos encontrados
     WifiDirect.addListener('listPeers', (info) => {
       const obj = JSON.parse(info.listPeers);
@@ -20,21 +27,21 @@ function App() {
     });
 
     // Desconexión de dispositvos
-    WifiDirect.addListener('disconnected', (info) => {
+    WifiDirect.addListener('disconnected', async (info) => {
       console.log('Desconectado del grupo P2P:', info);
 
       // Reiniciar búsqueda automáticamente
       try {
         console.log('Reiniciando descubrimiento de peers...');
-        WifiDirect.startDiscovery();
+        await WifiDirect.startDiscovery();
       } catch (error) {
         console.error('Error reiniciando descubrimiento:', error);
       }
     });
 
-    // Gestión de errores
-    WifiDirect.addListener('connectionFailed', (info) => {
-      console.error('Error de conexión:', info.error);
+    // Gestion de error
+    WifiDirect.addListener('error', (info) => {
+      console.error('Error general:', info.error);
     });
 
     // Eventos de escucha para cliente y servidor
@@ -46,89 +53,78 @@ function App() {
 
     // Resultado transferencia de archivo
     WifiDirect.addListener('file', async (info) => {
-      // Insertar registros en la base de datos local
-      await stringToJSON(info);
+      // leer contenido del archivo
+      alert("archivo recibido");
+
+      let data = JSON.stringify(info.file, null, 2);
+      alert("leyendo contenido del archivo recibido: " + data);
+
+      handleCloseConnection();
     });
 
     return () => {
-      WifiDirect.removeAllListeners();
+      WifiDirect.remove();
     };
   }, []);
 
   // Iniciar descubrimiento de peers
   const startDiscovery = async () => {
     try {
-      console.log('Iniciando descubrimiento de peers...');
       const result = await WifiDirect.startDiscovery();
-      console.log(result.status);
+      console.log(result);
       setResDis(true);
     } catch (error) {
       console.error('Error iniciando descubrimiento:', error);
     }
   };
 
-  // Conectar dispositivo seleccionado
-  const handleConnetDevice = (device) => {
-    WifiDirect.connectTo({ deviceAddress: device });
+  const handleConnectDevice = async (device) => {
+    await WifiDirect.connectTo({ deviceAddress: device });
   }
 
   const handleSendFile = async () => {
     try {
-      // Recuperar datos de la consulta
+      const response = await getControl();
 
-      // Iniciar transferencia de archivos
-      //const resTransfer = await WifiDirect.startTransfer({ file: file.path });
-      //console.log("Estado del servidor", resTransfer.server);
+      let cadData = response.map(row =>
+        Object.keys(row).map(item => row[item])
+      );
+
+      const dataJson = {
+        "values": cadData
+      };
+
+      const data = JSON.stringify(dataJson, null, 2);
+
+      await Filesystem.writeFile({
+        path: 'archivo.json',
+        data: data,
+        directory: Directory.Library,
+        encoding: 'utf8'
+      });
+
+      const readFile = await Filesystem.getUri({
+        path: 'archivo.json',
+        directory: Directory.Library
+      });
+
+      const resTransfer = await WifiDirect.startTransfer({ file: readFile.uri });
+      console.log("Estado del servidor", resTransfer.server);
     } catch (error) {
       console.error("Error al abrir archivo:", error.message);
     }
   };
 
   // Desconectar dispostivos
-  const handleCloseConnection = () => {
-    WifiDirect.closeConnection()
-      .then(info => console.log(info))
-      .catch(error => console.log(error));
-  }
-
-  const stringToJSON = async (info) => {
-    try {
-      let data = JSON.parse(info.file);
-      const values = data.tables[0].values;
-
-      for (const data of values) {
-        const config = {
-          method: 'POST',
-          requestType: 'patito',
-          body: {
-            id_proyecto: data[0],
-            nom_proyecto: data[1],
-            estatus: '0'
-          }
-        }
-
-        // Insertar registros en la base de datos
-        const result = await addRegistro(config);
-        if (result.status === 200) {
-          // actualizar estado
-          setData(prevData => [...prevData, {
-            id_proyecto: data[0],
-            nom_proyecto: data[1],
-            estatus: '0'
-          }]);
-          console.log(result.message);
-        }
-      }
-    } catch (error) {
-      console.error('Ocurrió un error: ', error);
-    }
+  const handleCloseConnection = async () => {
+    await WifiDirect.closeConnection()
   }
 
   return (
     <div className="App">
       <h3>Prueba de Conexión Wi-Fi Direct</h3>
 
-      <button onClick={async () => startDiscovery()}>Iniciar búsqueda</button>
+      <button onClick={async () => startDiscovery()}>Iniciar descubrimiento</button>
 
       {resDis && (
         <>
@@ -138,7 +134,7 @@ function App() {
             return (
               <div
                 key={row.deviceAddress}
-                onClick={isAvailable ? () => handleConnetDevice(row.deviceAddress) : undefined}
+                onClick={isAvailable ? async () => handleConnectDevice(row.deviceAddress) : null}
                 onDoubleClick={handleCloseConnection}
               >
                 <h5>device: {row.deviceName}</h5>
@@ -153,4 +149,4 @@ function App() {
   );
 }
 
-export default App;
+export default App

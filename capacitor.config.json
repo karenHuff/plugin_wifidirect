@@ -1,6 +1,5 @@
 {
-  "appId": "com.wifidirect.app",
-  "appName": "wifidirect",
-  "webDir": "dist",
-  "bundledWebRuntime": false
+  "appId": "com.example.app",
+  "appName": "p2pmanager",
+  "webDir": "dist"
 }
