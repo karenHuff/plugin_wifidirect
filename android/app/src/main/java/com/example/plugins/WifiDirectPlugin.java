@@ -3,7 +3,6 @@ package com.example.plugins;
 import android.Manifest;
 import android.content.Context;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pManager;
@@ -12,11 +11,13 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +30,7 @@ permissions = {
         ),
         @Permission(
                 alias="location",
-                strings={ Manifest.permission.ACCESS_FINE_LOCATION }
+                strings={ Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }
         )
 })
 public class WifiDirectPlugin extends Plugin {
@@ -42,43 +43,32 @@ public class WifiDirectPlugin extends Plugin {
 
     @Override
     public void load() {
-        manager = (WifiP2pManager) getActivity().getSystemService(Context.WIFI_P2P_SERVICE);
-        if (manager != null) {
-            channel = manager.initialize(getActivity(), getActivity().getMainLooper(), null);
+        manager = (WifiP2pManager) getContext().getSystemService(Context.WIFI_P2P_SERVICE);
 
-            // Eventos de escucha del broadcastReceiver
-            intentFilter = new IntentFilter();
-            intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
-            intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
-            intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
+        if (manager == null) return;
 
-            Log.d(TAG, "Plugin inicializado correctamente");
-            connection = new WifiDirectConnection(manager, channel, this);
+        channel = manager.initialize(getContext(), getContext().getMainLooper(), null);
 
-            if (!checkPermissions()) {
-                Toast.makeText(getActivity(), "Solicitando permisos", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        // Eventos de escucha del broadcastReceiver
+        intentFilter = new IntentFilter();
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
 
-            checkWiFi();
-        } else {
-            Log.e(TAG, "WifiP2pManager no disponible");
-        }
+        Log.d(TAG, "Plugin inicializado correctamente");
+        connection = new WifiDirectConnection(manager, channel, this);
+
+        checkWiFi();
     }
 
     /* Métodos del ciclo de vida */
     @Override
     protected void handleOnResume() {
         super.handleOnResume();
-
-        if (manager == null || channel == null) {
-            Log.e(TAG, "Manager o Channel no inicializados");
-            return;
-        }
-
-        if (receiver == null) {
+        if (manager != null && receiver == null) {
             receiver = new WifiDirectReceiver(manager, channel, this);
-            getActivity().registerReceiver(receiver, intentFilter);
+            getContext().registerReceiver(receiver, intentFilter);
+
             Log.d(TAG, "Receiver registrado correctamente");
         }
     }
@@ -86,39 +76,22 @@ public class WifiDirectPlugin extends Plugin {
     @Override
     protected void handleOnPause() {
         super.handleOnPause();
-        try {
-            if (receiver != null) {
-                getActivity().unregisterReceiver(receiver);
-                receiver = null;
-                Log.d(TAG, "Receiver desregistrado");
+        if (receiver != null) {
+            try {
+                getContext().unregisterReceiver(receiver);
+            } catch (IllegalArgumentException ex) {
+                Log.w(TAG, "Receiver no registrado previo a pause" + ex.getMessage());
             }
-        } catch (IllegalArgumentException e) {
-            Log.w(TAG, "Receiver ya estaba desregistrado");
+
+            receiver = null;
         }
     }
 
     public boolean checkPermissions() {
-        List<String> requirePermissions = new ArrayList<>();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && getActivity()
-                .checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
-
-            requirePermissions.add(Manifest.permission.NEARBY_WIFI_DEVICES);
-            Log.w("permissions", "Permiso solicitado");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return getPermissionState("wifi") == PermissionState.GRANTED;
         }
-
-        if (getActivity().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requirePermissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
-            Log.w("permissions", "Permiso de ubicación solicitado");
-        }
-
-        if (!requirePermissions.isEmpty()) {
-            getActivity().requestPermissions(
-                    requirePermissions.toArray(new String[0]), 100);
-            return false;
-        }
-
-        return true;
+        return getPermissionState("location") == PermissionState.GRANTED;
     }
 
     /*  verificar estado de wifi */
@@ -132,30 +105,9 @@ public class WifiDirectPlugin extends Plugin {
         }
     }
 
-    /* Eventos hacia JavaScript */
-    public void onPeerConnectionFailed(String message) {
-        JSObject ret = new JSObject();
-        ret.put("error", message);
-        notifyListeners("connectionFailed", ret);
-    }
-
-    public void onDisconnected() {
-        JSObject ret = new JSObject();
-        ret.put("status", "Desconectado del grupo P2P");
-        notifyListeners("disconnected", ret);
-    }
-
-    public void onResSocket(Boolean flag) {
-        JSObject ret = new JSObject();
-        ret.put("status", flag);
-        notifyListeners("socket", ret);
-    }
-
-    // Enviar lista de dispositivos al front
+    /* Listeners emitidos hacia JavaScript */
     public void onListPeers(List<WifiP2pDevice> peers) {
         List<JSObject> peerList = new ArrayList<>();
-        JSObject ret = new JSObject();
-
         for (WifiP2pDevice device : peers) {
             JSObject jsObject = new JSObject();
             jsObject.put("deviceName", device.deviceName);
@@ -164,8 +116,15 @@ public class WifiDirectPlugin extends Plugin {
             peerList.add(jsObject);
         }
 
+        JSObject ret = new JSObject();
         ret.put("listPeers", peerList);
         notifyListeners("listPeers", ret);
+    }
+
+    public void onClientStarted() {
+        JSObject ret = new JSObject();
+        ret.put("status", true);
+        notifyListeners("isClient", ret);
     }
 
     public void onContentJSON(String contentJSON) {
@@ -174,14 +133,28 @@ public class WifiDirectPlugin extends Plugin {
         notifyListeners("file", ret);
     }
 
+    public void onDisconnected() {
+        JSObject ret = new JSObject();
+        ret.put("status", "Desconectado del grupo P2P");
+        notifyListeners("disconnected", ret);
+    }
+
     /* Plugin methods */
     @PluginMethod
     public void startDiscovery(PluginCall call) {
+        if (!checkPermissions()) {
+            requestAllPermissions(call, "permissionCallback");
+            return;
+        }
         connection.startDiscovery(call);
     }
 
     @PluginMethod
     public void connectTo(PluginCall call) {
+        if (!checkPermissions()) {
+            requestAllPermissions(call, "permissionCallback");
+            return;
+        }
         connection.connectTo(call);
     }
 
@@ -194,4 +167,19 @@ public class WifiDirectPlugin extends Plugin {
     public void closeConnection(PluginCall call) {
         connection.closeConnection(call);
     }
+
+    @PermissionCallback
+    private void permissionCallback(PluginCall call) {
+        if (checkPermissions()) {
+            String methodName = call.getMethodName();
+            if ("startDiscovery".equals(methodName)) {
+                startDiscovery(call);
+            } else if ("connectTo".equals(methodName)) {
+                connectTo(call);
+            }
+        } else {
+            call.reject("Permisos de ubicación o Wi-Fi denegados");
+        }
+    }
+
 }
