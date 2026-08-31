@@ -1,22 +1,18 @@
 package com.example.plugins;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
-import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.WpsInfo;
-import android.os.Build;
 import android.util.Log;
-
-import androidx.core.app.ActivityCompat;
 
 import com.example.sockets.StartClientSocket;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.JSObject;
 
+import java.util.concurrent.Executors;
+
 public class WifiDirectConnection {
-    private static final String TAG = "wfdPlugin";
+    private static final String TAG = "wfdPConnection";
 
     private final WifiP2pManager manager;
     private final WifiP2pManager.Channel channel;
@@ -27,14 +23,11 @@ public class WifiDirectConnection {
         this.channel = channel;
         this.plugin = plugin;
     }
-    
+
+    @SuppressWarnings("MissingPermission")
     public void startDiscovery(PluginCall call) {
         if (manager == null || channel == null) {
             call.reject("WifiP2pManager", "Manager no inicializado");
-            return;
-        }
-
-        if (ActivityCompat.checkSelfPermission(plugin.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(plugin.getContext(), Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
 
@@ -48,11 +41,12 @@ public class WifiDirectConnection {
 
             @Override
             public void onFailure(int reason) {
-                call.reject("error", "Fallo al iniciar descubrimiento: " + reason);
+                call.reject("error", "Fallo al iniciar descubrimiento: " + getReasonText(reason));
             }
         });
     }
 
+    @SuppressWarnings("MissingPermission")
     public void connectTo(PluginCall call) {
         String deviceAddress = call.getString("deviceAddress");
 
@@ -61,28 +55,17 @@ public class WifiDirectConnection {
             return;
         }
 
-        WifiP2pGroup group = new WifiP2pGroup();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            group.getNetworkId();
-        }
-
         WifiP2pConfig config = new WifiP2pConfig();
         config.deviceAddress = deviceAddress;
         config.wps.setup = WpsInfo.PBC;
-
-        // prioridad para ser propietario del grupo
-        config.groupOwnerIntent = 15;
+        config.groupOwnerIntent = 15; // prioridad para ser propietario del grupo
 
         Log.d(TAG, "Intentando conectar a: " + deviceAddress);
 
-        if (ActivityCompat.checkSelfPermission(plugin.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(plugin.getContext(), Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
         manager.connect(channel, config, new WifiP2pManager.ActionListener() {
             @Override
             public void onSuccess() {
                 JSObject ret = new JSObject();
-                Log.d(TAG, "Solicitud de conexión enviada a: " + deviceAddress);
                 ret.put("deviceAddress", deviceAddress);
                 call.resolve(ret);
             }
@@ -90,8 +73,7 @@ public class WifiDirectConnection {
             @Override
             public void onFailure(int reason) {
                 Log.e(TAG, "Fallo al conectar" + reason);
-                plugin.onPeerConnectionFailed("Error al conectar: " + reason);
-                call.reject("Error al conectar: " + reason);
+                call.reject("Fallo al conectar con: " + deviceAddress + ":" + getReasonText(reason));
             }
         });
     }
@@ -101,24 +83,25 @@ public class WifiDirectConnection {
 
         if (filePath == null || filePath.isEmpty()) {
             Log.e("WifiDirect", "Ruta de archivo no proporcionada");
+            call.reject("Ruta de archivo no proprcionada");
             return;
         }
 
-        Log.d("trsnafer", "Iniciando transferencia");
+        Log.d("transfer", "Iniciando transferencia");
 
-        try {
-            manager.requestConnectionInfo(channel, info -> {
-                if (info.groupFormed && !info.isGroupOwner) {
+        manager.requestConnectionInfo(channel, info -> {
+            if (info.groupFormed && !info.isGroupOwner) {
+                Executors.newSingleThreadExecutor().execute(() -> {
                     String hostAddress = info.groupOwnerAddress.getHostAddress();
-                    // iniciar cliente
-                    new StartClientSocket(plugin.getContext(), filePath, hostAddress).start();
-                } else {
-                    Log.e("Error", "Intentado ser servidor...");
-                }
-            });
-        } catch (Exception ex) {
-            Log.e("Error", "Ocurrió un error" + ex.getMessage());
-        }
+
+                    JSObject ret = new JSObject();
+                    ret.put("stauts", "iniciando transferencia");
+                    call.resolve(ret);
+                });
+            } else {
+                call.reject("El dispositivo no está conectado como cliente P2P");
+            }
+        });
     }
 
     public void closeConnection(PluginCall call) {
@@ -129,15 +112,24 @@ public class WifiDirectConnection {
             public void onSuccess() {
                 Log.d(TAG, "Eliminando grupo");
                 JSObject ret = new JSObject();
-                ret.put("status", "Grupo eliminado correctamente");
+                ret.put("status", "Grupo P2P cerrado correctamente");
                 call.resolve(ret);
             }
 
             @Override
             public void onFailure(int reason) {
                 Log.e("closeConnection", "Error al intentar eliminar el GO: " + reason);
-                call.reject("Erro al eliminar grupo" + reason);
+                call.reject("Erro al cerrar el grupo P2P:" + getReasonText(reason));
             }
         });
+    }
+
+    private String getReasonText(int reason) {
+        switch (reason) {
+            case WifiP2pManager.P2P_UNSUPPORTED: return "P2P No Soportado";
+            case WifiP2pManager.BUSY: return "Sistema Ocupado";
+            case WifiP2pManager.ERROR: return "Error interno";
+            default: return "Razón desocnocida (" + reason + ")";
+        }
     }
 }
