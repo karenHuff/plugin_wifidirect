@@ -1,6 +1,7 @@
 package com.example.plugins;
 
 import android.net.wifi.p2p.WifiP2pConfig;
+import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.WpsInfo;
 import android.util.Log;
@@ -9,11 +10,10 @@ import com.example.sockets.StartClientSocket;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.JSObject;
 
-import java.util.concurrent.Executors;
+import java.lang.reflect.Method;
 
 public class WifiDirectConnection {
-    private static final String TAG = "wfdPConnection";
-
+    private static final String TAG = "wfdConnection";
     private final WifiP2pManager manager;
     private final WifiP2pManager.Channel channel;
     private final WifiDirectPlugin plugin;
@@ -91,13 +91,14 @@ public class WifiDirectConnection {
 
         manager.requestConnectionInfo(channel, info -> {
             if (info.groupFormed && !info.isGroupOwner) {
-                Executors.newSingleThreadExecutor().execute(() -> {
-                    String hostAddress = info.groupOwnerAddress.getHostAddress();
+                String hostAddres = info.groupOwnerAddress.getHostAddress();
+                // iniciar cliente
+                StartClientSocket client = new StartClientSocket(plugin.getContext(), filePath, hostAddres);
+                client.start();
 
-                    JSObject ret = new JSObject();
-                    ret.put("stauts", "iniciando transferencia");
-                    call.resolve(ret);
-                });
+                JSObject ret = new JSObject();
+                ret.put("status", "Iniciando transferencia");
+                call.resolve(ret);
             } else {
                 call.reject("El dispositivo no está conectado como cliente P2P");
             }
@@ -119,7 +120,7 @@ public class WifiDirectConnection {
             @Override
             public void onFailure(int reason) {
                 Log.e("closeConnection", "Error al intentar eliminar el GO: " + reason);
-                call.reject("Erro al cerrar el grupo P2P:" + getReasonText(reason));
+                call.reject("Error al cerrar el grupo P2P:" + getReasonText(reason));
             }
         });
     }
