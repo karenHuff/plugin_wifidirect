@@ -21,11 +21,6 @@ function App() {
       setDevices(obj);
     });
 
-    // Resultado de conexión
-    WifiDirect.addListener('connected', info => {
-      console.log('Dispositivo conectado ', info);
-    });
-
     // Desconexión de dispositvos
     WifiDirect.addListener('disconnected', async (info) => {
       console.log('Desconectado del grupo P2P:', info);
@@ -39,13 +34,8 @@ function App() {
       }
     });
 
-    // Gestion de error
-    WifiDirect.addListener('error', (info) => {
-      console.error('Error general:', info.error);
-    });
-
-    // Eventos de escucha para cliente y servidor
-    WifiDirect.addListener('socket', async (info) => {
+    // Eventos de escucha para client
+    WifiDirect.addListener('isClient', async (info) => {
       if (info.status) {
         await handleSendFile();
       }
@@ -55,9 +45,7 @@ function App() {
     WifiDirect.addListener('file', async (info) => {
       // leer contenido del archivo
       alert("archivo recibido");
-
-      let data = JSON.stringify(info.file, null, 2);
-      alert("leyendo contenido del archivo recibido: " + data);
+      alert("leyendo contenido del archivo recibido: " + info.file);
 
       handleCloseConnection();
     });
@@ -70,8 +58,7 @@ function App() {
   // Iniciar descubrimiento de peers
   const startDiscovery = async () => {
     try {
-      const result = await WifiDirect.startDiscovery();
-      console.log(result);
+      await WifiDirect.startDiscovery();
       setResDis(true);
     } catch (error) {
       console.error('Error iniciando descubrimiento:', error);
