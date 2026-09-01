@@ -8,6 +8,8 @@ import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.util.Log;
 
+import com.example.sockets.StartServerSocket;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,7 +51,7 @@ public class WifiDirectReceiver extends BroadcastReceiver {
 
             case WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION:
                 NetworkInfo networkInfo = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
-
+                StartServerSocket server = new StartServerSocket(plugin.getContext(), plugin);
                 if (networkInfo != null && networkInfo.isConnected()) {
                     // Consultar el estado del grupo P2P
                     manager.requestConnectionInfo(channel, info -> {
@@ -57,6 +59,8 @@ public class WifiDirectReceiver extends BroadcastReceiver {
                             if (info.isGroupOwner) {
                                 Log.d(TAG, "Soy el Group Owner");
                                 // iniciar servidor
+
+                                server.start();
                             } else {
                                 Log.d(TAG, "Preparando cliente");
                                 plugin.onClientStarted();
@@ -67,6 +71,7 @@ public class WifiDirectReceiver extends BroadcastReceiver {
                     });
                 } else {
                     Log.d(TAG, "Desconectado del grupo P2P");
+                    server.stop();
                     plugin.onDisconnected();
                 }
                 break;
