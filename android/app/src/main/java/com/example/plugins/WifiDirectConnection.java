@@ -10,8 +10,6 @@ import com.example.sockets.StartClientSocket;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.JSObject;
 
-import java.lang.reflect.Method;
-
 public class WifiDirectConnection {
     private static final String TAG = "wfdConnection";
     private final WifiP2pManager manager;
@@ -30,8 +28,6 @@ public class WifiDirectConnection {
             call.reject("WifiP2pManager", "Manager no inicializado");
             return;
         }
-
-        deletePersistentGroup();
 
         manager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
             @Override
@@ -133,34 +129,6 @@ public class WifiDirectConnection {
             case WifiP2pManager.BUSY: return "Sistema Ocupado";
             case WifiP2pManager.ERROR: return "Error interno";
             default: return "Razón desocnocida (" + reason + ")";
-        }
-    }
-
-    private void deletePersistentGroup() {
-        try {
-            Method[] methods = WifiP2pManager.class.getMethods();
-            for (Method method : methods) {
-                if (method.getName().equals("deletePersistentGroup")) {
-                    Log.d("persistenGroup", "intentando eliminar");
-                    
-                    for (int netId = 0; netId < 32; netId++) {
-                        method.invoke(manager, channel, netId, new WifiP2pManager.ActionListener() {
-                            @Override
-                            public void onSuccess() {
-                                // Grupo persistente borrado
-                                Log.d("persistentGroup", "Grupo eliminado");
-                            }
-
-                            @Override
-                            public void onFailure(int reason) {
-                                // No existe el id de grupo o falló
-                            }
-                        });
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 }
