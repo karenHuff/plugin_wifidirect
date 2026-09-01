@@ -181,5 +181,4 @@ public class WifiDirectPlugin extends Plugin {
             call.reject("Permisos de ubicación o Wi-Fi denegados");
         }
     }
-
 }
