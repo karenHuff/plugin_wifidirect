@@ -19,6 +19,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import com.example.sockets.StartServerSocket;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +42,7 @@ public class WifiDirectPlugin extends Plugin {
     private static final String TAG = "wfdPlugin";
     private WifiDirectReceiver receiver;
     private WifiDirectConnection connection;
+    private StartServerSocket serverSocket;
 
     @Override
     public void load() {
@@ -57,6 +60,8 @@ public class WifiDirectPlugin extends Plugin {
 
         Log.d(TAG, "Plugin inicializado correctamente");
         connection = new WifiDirectConnection(manager, channel, this);
+
+        serverSocket = new StartServerSocket(getContext(), this);
 
         checkWiFi();
     }
@@ -103,6 +108,25 @@ public class WifiDirectPlugin extends Plugin {
             Toast.makeText(getActivity(), "Activa el Wi-Fi", Toast.LENGTH_SHORT).show();
             Log.w(TAG, "Wi-Fi deshabilitado");
         }
+    }
+
+    public synchronized void startServerSocket() {
+        if (serverSocket == null) {
+            serverSocket = new StartServerSocket(getContext(), this);
+        }
+
+        Log.d(TAG, "Iniciando servidor");
+        serverSocket.start();
+    }
+
+    public synchronized void stopServerSocket() {
+        if (serverSocket == null) {
+            return;
+        }
+
+        Log.d(TAG, "Deteniendo servidor");
+
+        serverSocket.stop();
     }
 
     /* Listeners emitidos hacia JavaScript */

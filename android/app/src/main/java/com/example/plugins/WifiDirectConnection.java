@@ -1,9 +1,11 @@
 package com.example.plugins;
 
+import android.net.MacAddress;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.WpsInfo;
+import android.os.Build;
 import android.util.Log;
 
 import com.example.sockets.StartClientSocket;
@@ -53,10 +55,17 @@ public class WifiDirectConnection {
             return;
         }
 
-        WifiP2pConfig config = new WifiP2pConfig();
-        config.deviceAddress = deviceAddress;
-        config.wps.setup = WpsInfo.PBC;
-        config.groupOwnerIntent = 15; // prioridad para ser propietario del grupo
+        WifiP2pConfig config = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            config = new WifiP2pConfig.Builder()
+                    .setDeviceAddress(
+                            MacAddress.fromString(
+                                    deviceAddress
+                            )
+                    )
+                    .enablePersistentMode(false)
+                    .build();
+        }
 
         Log.d(TAG, "Intentando conectar a: " + deviceAddress);
 

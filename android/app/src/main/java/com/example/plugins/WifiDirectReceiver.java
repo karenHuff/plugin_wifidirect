@@ -60,7 +60,7 @@ public class WifiDirectReceiver extends BroadcastReceiver {
                                 Log.d(TAG, "Soy el Group Owner");
                                 // iniciar servidor
 
-                                server.start();
+                                plugin.startServerSocket();
                             } else {
                                 Log.d(TAG, "Preparando cliente");
                                 plugin.onClientStarted();
@@ -71,7 +71,7 @@ public class WifiDirectReceiver extends BroadcastReceiver {
                     });
                 } else {
                     Log.d(TAG, "Desconectado del grupo P2P");
-                    server.stop();
+                    plugin.stopServerSocket();
                     plugin.onDisconnected();
                 }
                 break;
